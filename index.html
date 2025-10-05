@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>simpleplay（複数音源版）</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: sans-serif;
+      background: #f0f0f0;
+    }
+    button {
+      font-size: 1.2rem;
+      padding: 0.5em 1em;
+      margin: 0.5em;
+      cursor: pointer;
+    }
+    #fileInput {
+      display: none; /* 画面には見せない */
+    }
+    #status {
+      font-size: 1rem;
+      color: #333;
+      margin-top: 1em;
+    }
+    .volume-control {
+      display: flex;
+      align-items: center;
+      margin-top: 1em;
+    }
+    .volume-control label {
+      margin-right: 0.5em;
+    }
+    input[type="range"] {
+      width: 150px;
+    }
+  </style>
+</head>
+<body>
+  <button id="loadButton">MP3音源を読み込む（複数可）</button>
+  <input type="file" id="fileInput" accept="audio/mp3,audio/mpeg" multiple>
+
+  <div class="volume-control">
+    <label for="volumeSlider">音量：</label>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
+  </div>
+
+  <p id="status">音源がまだ読み込まれていません。</p>
+
+  <script>
+    let audioList = [];
+    let currentIndex = 0;
+    let isPlaying = false;
+
+    const loadButton = document.getElementById('loadButton');
+    const fileInput = document.getElementById('fileInput');
+    const statusText = document.getElementById('status');
+    const volumeSlider = document.getElementById('volumeSlider');
+
+    // 📥 ボタンでファイル選択ダイアログを開く
+    loadButton.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    // 📂 ファイルが選択されたとき
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) {
+        audioList = files.map(file => {
+          const url = URL.createObjectURL(file);
+          const audio = new Audio(url);
+          audio.volume = volumeSlider.value;
+          return audio;
+        });
+        currentIndex = 0;
+        statusText.textContent = `${files.length} 件の音源を読み込みました。再生待機中。`;
+      }
+    });
+
+    // ▶ 再生処理
+    function playSound() {
+      if (audioList.length === 0) return;
+      if (isPlaying) return;
+
+      const audio = audioList[currentIndex];
+      audio.currentTime = 0;
+      audio.volume = volumeSlider.value;
+      isPlaying = true;
+      statusText.textContent = `再生中：${currentIndex + 1} / ${audioList.length}`;
+      audio.play();
+
+      audio.onended = () => {
+        isPlaying = false;
+        currentIndex = (currentIndex + 1) % audioList.length;
+        statusText.textContent = `再生待機中：${currentIndex + 1} / ${audioList.length}`;
+      };
+    }
+
+    // 🔊 音量調整（すべての音源に反映）
+    volumeSlider.addEventListener('input', () => {
+      audioList.forEach(a => a.volume = volumeSlider.value);
+    });
+
+    // ⏯ クリック・タップ・キー押下で再生
+    document.addEventListener('click', playSound);
+    document.addEventListener('touchstart', playSound);
+    document.addEventListener('keydown', playSound);
+  </script>
+</body>
+</html>
