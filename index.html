@@ -2,9 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>音源プレイヤー（マルチブラウザ対応）</title>
+  <title>マルチブラウザ対応 音源プレイヤー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
     label, input[type=range] {
       font-size: 18px;
       display: inline-block;
@@ -25,9 +31,9 @@
   </style>
 </head>
 <body>
-  <h1>音源プレイヤー（mp3 / m4a 対応）</h1>
+  <h1>音源プレイヤー（Windows / Android / iPad / iPhone 対応）</h1>
 
-  <!-- label を使ってネイティブに file input を開く -->
+  <!-- labelでfile inputを開く：全ブラウザで安定 -->
   <label for="fileInput">音源を読み込む</label>
   <input id="fileInput" type="file" accept=".mp3,.m4a,audio/*" multiple>
 
@@ -46,8 +52,33 @@
     let audioFiles = [];
     let currentIndex = 0;
     let isPlaying = false;
-    let audioElement = null;
+    let audioElement = new Audio();
+    audioElement.preload = 'auto';
 
+    // iOS Safari / Chrome 対策用：AudioContext unlock
+    let audioCtx;
+    let isAudioUnlocked = false;
+    function unlockAudio() {
+      if (!isAudioUnlocked) {
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          source.start(0);
+          isAudioUnlocked = true;
+          console.log('AudioContext unlocked!');
+        } catch (e) {
+          console.warn('AudioContext unlock failed:', e);
+        }
+      }
+    }
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    // ファイル読み込み
     fileInput.addEventListener('change', () => {
       const files = Array.from(fileInput.files);
       if (files.length > 0) {
@@ -57,34 +88,37 @@
       }
     });
 
+    // 音量調整
     volumeSlider.addEventListener('input', () => {
-      if (audioElement) {
-        audioElement.volume = volumeSlider.value;
-      }
+      audioElement.volume = volumeSlider.value;
     });
 
+    // 再生処理
     function tryPlay() {
       if (isPlaying || audioFiles.length === 0) return;
 
       const file = audioFiles[currentIndex];
       const url = URL.createObjectURL(file);
-      audioElement = new Audio(url);
+      audioElement.src = url;
       audioElement.volume = volumeSlider.value;
 
       isPlaying = true;
-      audioElement.play();
+      audioElement.play().catch(err => {
+        console.error('再生エラー:', err);
+        isPlaying = false;
+      });
 
-      audioElement.addEventListener('ended', () => {
+      audioElement.onended = () => {
         isPlaying = false;
         URL.revokeObjectURL(url);
         currentIndex++;
         if (currentIndex >= audioFiles.length) {
           currentIndex = 0;
         }
-      });
+      };
     }
 
-    // クリック・タップ・キー押下で再生
+    // ユーザー操作で再生
     document.body.addEventListener('click', tryPlay);
     document.body.addEventListener('touchstart', tryPlay);
     document.body.addEventListener('keydown', tryPlay);
